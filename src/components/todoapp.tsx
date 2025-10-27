@@ -9,9 +9,9 @@ const TodoApp: React.FC = () => {
   const [task, setTask] = useState("");
   const [tasks, setTasks] = useState<Task[]>([]);
 
-  // Handle adding a task
+  // Add task
   const handleAddTask = () => {
-    if (task.trim() === "") return; // Prevent blank input
+    if (task.trim() === "") return;
 
     const newTask: Task = {
       id: Date.now(),
@@ -19,7 +19,12 @@ const TodoApp: React.FC = () => {
     };
 
     setTasks((prevTasks) => [...prevTasks, newTask]);
-    setTask(""); // clear input
+    setTask("");
+  };
+
+  // Delete task
+  const handleDeleteTask = (id: number) => {
+    setTasks((prevTasks) => prevTasks.filter((task) => task.id !== id));
   };
 
   return (
@@ -57,6 +62,12 @@ const TodoApp: React.FC = () => {
                 className="flex justify-between items-center bg-gray-50 border border-gray-200 rounded-lg px-3 py-2"
               >
                 <span>{item.text}</span>
+                <button
+                  onClick={() => handleDeleteTask(item.id)}
+                  className="text-red-500 hover:text-red-700 transition"
+                >
+                  ✕
+                </button>
               </li>
             ))
           )}

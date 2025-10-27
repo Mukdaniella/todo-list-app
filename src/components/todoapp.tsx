@@ -1,7 +1,26 @@
 import React, { useState } from "react";
 
+interface Task {
+  id: number;
+  text: string;
+}
+
 const TodoApp: React.FC = () => {
   const [task, setTask] = useState("");
+  const [tasks, setTasks] = useState<Task[]>([]);
+
+  // Handle adding a task
+  const handleAddTask = () => {
+    if (task.trim() === "") return; // Prevent blank input
+
+    const newTask: Task = {
+      id: Date.now(),
+      text: task.trim(),
+    };
+
+    setTasks((prevTasks) => [...prevTasks, newTask]);
+    setTask(""); // clear input
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
@@ -20,15 +39,27 @@ const TodoApp: React.FC = () => {
             className="flex-1 border border-gray-300 rounded-l-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
           <button
+            onClick={handleAddTask}
             className="bg-blue-500 text-white px-4 py-2 rounded-r-lg hover:bg-blue-600 transition"
           >
             Add
           </button>
         </div>
 
-        {/* Task List (empty for now) */}
+        {/* Task List */}
         <ul className="space-y-2">
-          <li className="text-gray-500 text-center">No tasks yet</li>
+          {tasks.length === 0 ? (
+            <li className="text-gray-500 text-center">No tasks yet</li>
+          ) : (
+            tasks.map((item) => (
+              <li
+                key={item.id}
+                className="flex justify-between items-center bg-gray-50 border border-gray-200 rounded-lg px-3 py-2"
+              >
+                <span>{item.text}</span>
+              </li>
+            ))
+          )}
         </ul>
       </div>
     </div>

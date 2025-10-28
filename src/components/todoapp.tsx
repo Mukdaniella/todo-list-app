@@ -27,25 +27,48 @@ const TodoApp: React.FC = () => {
     setTasks((prevTasks) => prevTasks.filter((task) => task.id !== id));
   };
 
+  // Drag and Drop
+  const handleDragStart = (e: React.DragEvent<HTMLLIElement>, id: number) => {
+    e.dataTransfer.setData("taskId", id.toString());
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLLIElement>, dropId: number) => {
+    const dragId = parseInt(e.dataTransfer.getData("taskId"));
+    if (dragId === dropId) return;
+
+    const dragIndex = tasks.findIndex((t) => t.id === dragId);
+    const dropIndex = tasks.findIndex((t) => t.id === dropId);
+
+    const updatedTasks = [...tasks];
+    const [draggedTask] = updatedTasks.splice(dragIndex, 1);
+    updatedTasks.splice(dropIndex, 0, draggedTask);
+
+    setTasks(updatedTasks);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLLIElement>) => {
+    e.preventDefault();
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
       <div className="bg-white shadow-lg rounded-2xl w-full max-w-md p-6">
         <h1 className="text-2xl font-bold text-center mb-6 text-gray-800">
-          📝 To-Do List
+          📝 To-Do List App
         </h1>
 
         {/* Input + Add button */}
-        <div className="flex mb-4">
+        <div className="flex mb-4 gap-3">
           <input
             type="text"
             value={task}
             onChange={(e) => setTask(e.target.value)}
             placeholder="Enter a new task..."
-            className="flex-1 border border-gray-300 rounded-l-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
           />
           <button
             onClick={handleAddTask}
-            className="bg-blue-500 text-white px-4 py-2 rounded-r-lg hover:bg-blue-600 transition"
+            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition"
           >
             Add
           </button>
@@ -59,7 +82,11 @@ const TodoApp: React.FC = () => {
             tasks.map((item) => (
               <li
                 key={item.id}
-                className="flex justify-between items-center bg-gray-50 border border-gray-200 rounded-lg px-3 py-2"
+                draggable
+                onDragStart={(e) => handleDragStart(e, item.id)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, item.id)}
+                className="flex justify-between items-center bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 cursor-move hover:bg-gray-100 transition"
               >
                 <span>{item.text}</span>
                 <button

@@ -4,21 +4,23 @@ interface Task {
   id: number;
   text: string;
   completed: boolean;
-  category: "Today" | "Tomorrow";
+  x: number;
+  y: number;
 }
 
 const TodoApp: React.FC = () => {
   const [task, setTask] = useState("");
-  const [category, setCategory] = useState<"Today" | "Tomorrow">("Today");
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
 
-  // Load from localStorage
+  // Load tasks
   useEffect(() => {
     const saved = localStorage.getItem("tasks");
     if (saved) setTasks(JSON.parse(saved));
   }, []);
 
-  // Save to localStorage
+  // Save tasks
   useEffect(() => {
     localStorage.setItem("tasks", JSON.stringify(tasks));
   }, [tasks]);
@@ -29,126 +31,163 @@ const TodoApp: React.FC = () => {
       id: Date.now(),
       text: task.trim(),
       completed: false,
-      category,
+      x: 100 + tasks.length * 30,
+      y: 100 + tasks.length * 30,
     };
     setTasks((prev) => [...prev, newTask]);
     setTask("");
   };
 
+  const toggleCompletion = (id: number) =>
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
+    );
+
   const handleDeleteTask = (id: number) =>
     setTasks((prev) => prev.filter((t) => t.id !== id));
 
-  const toggleCompletion = (id: number) =>
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === id ? { ...t, completed: !t.completed } : t
-      )
-    );
-
-  const handleDragStart = (e: React.DragEvent<HTMLLIElement>, id: number) =>
-    e.dataTransfer.setData("taskId", id.toString());
-
-  const handleDrop = (e: React.DragEvent<HTMLLIElement>, dropId: number) => {
-    const dragId = parseInt(e.dataTransfer.getData("taskId"));
-    if (dragId === dropId) return;
-    const dragIndex = tasks.findIndex((t) => t.id === dragId);
-    const dropIndex = tasks.findIndex((t) => t.id === dropId);
-    const updated = [...tasks];
-    const [dragged] = updated.splice(dragIndex, 1);
-    updated.splice(dropIndex, 0, dragged);
-    setTasks(updated);
+  const handleMouseDown = (e: React.MouseEvent, id: number) => {
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+    setDraggingId(id);
+    setOffset({
+      x: e.clientX - task.x,
+      y: e.clientY - task.y,
+    });
   };
 
-  const handleDragOver = (e: React.DragEvent<HTMLLIElement>) =>
-    e.preventDefault();
+  // --- Collision detection logic ---
+  const CARD_WIDTH = 230;
+  const CARD_HEIGHT = 100;
 
-  const tasksByCategory = (cat: "Today" | "Tomorrow") =>
-    tasks.filter((t) => t.category === cat);
+  // Check if two tasks overlap
+  const isOverlapping = (a: Task, b: Task) => {
+    return !(
+      a.x + CARD_WIDTH < b.x ||
+      a.x > b.x + CARD_WIDTH ||
+      a.y + CARD_HEIGHT < b.y ||
+      a.y > b.y + CARD_HEIGHT
+    );
+  };
 
-  const categoryColors: Record<"Today" | "Tomorrow", string> = {
-    Today: "bg-green-300 border-green-300",
-    Tomorrow: "bg-green-200 border-green-300",
+  // Find nearest free spot
+  const findFreePosition = (task: Task, others: Task[]) => {
+    const step = 40; // pixels to move to avoid overlap
+    let newX = task.x;
+    let newY = task.y;
+    let tries = 0;
+
+    while (
+      others.some((t) => t.id !== task.id && isOverlapping({ ...task, x: newX, y: newY }, t)) &&
+      tries < 50
+    ) {
+      newX += step;
+      newY += step;
+      tries++;
+    }
+
+    return { x: newX, y: newY };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (draggingId === null) return;
+
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id === draggingId) {
+          const updated = {
+            ...t,
+            x: e.clientX - offset.x,
+            y: e.clientY - offset.y,
+          };
+          const others = prev.filter((p) => p.id !== t.id);
+          const newPos = findFreePosition(updated, others);
+          return { ...updated, ...newPos };
+        }
+        return t;
+      })
+    );
+  };
+
+  const handleMouseUp = () => {
+    setDraggingId(null);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-pink-50 to-blue-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl p-6 rounded-3xl shadow-xl bg-white">
-        <h1 className="text-3xl font-bold text-center mb-8 text-pink-600">
-             📝 To-Do List Board
+    <div
+      className="min-h-screen w-full bg-gradient-to-br from-green-50 via-green-100 to-green-200 relative overflow-hidden"
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+    >
+      {/* Top Bar */}
+      <header className="w-full bg-white/80 backdrop-blur-md shadow-sm border-b border-green-200 p-5 sticky top-0 z-10">
+        <h1 className="text-2xl font-bold text-green-900 text-center mb-2">
+          📝 To Do List Workspace
         </h1>
+        <p className="text-center text-green-800 text-sm">
+          Add, Display, Drag, Delete, and Complete your tasks — now with collision protection!
+        </p>
+      </header>
 
-        {/* Input */}
-        <div className="flex gap-3 mb-6">
-          <input
-            type="text"
-            value={task}
-            onChange={(e) => setTask(e.target.value)}
-            placeholder="Add a new task..."
-            className="flex-1 px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-pink-300 focus:outline-none shadow-sm"
-          />
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value as "Today" | "Tomorrow")}
-            className="px-3 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-pink-300 focus:outline-none shadow-sm"
-          >
-            <option className="bg-pink-400 hover:bg-pink-500" value="Today">Today</option>
-            <option className="bg-pink-400 hover:bg-pink-500" value="Tomorrow">Tomorrow</option>
-          </select>
-          <button
-            onClick={handleAddTask}
-            className="bg-pink-400 hover:bg-pink-500 px-5 py-2 rounded-xl font-semibold text-white shadow transition"
-          >
-            Add
-          </button>
-        </div>
-
-        {/* Task Sections */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {(["Today", "Tomorrow"] as const).map((cat) => (
-            <div key={cat}>
-              <h2 className="text-xl font-semibold mb-3">{cat}</h2>
-              <ul className="space-y-4">
-                {tasksByCategory(cat).length === 0 ? (
-                  <li className="text-gray-400 italic text-center">No tasks</li>
-                ) : (
-                  tasksByCategory(cat).map((item) => (
-                    <li
-                      key={item.id}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, item.id)}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, item.id)}
-                      className={`flex justify-between items-center p-4 rounded-2xl border ${categoryColors[cat]} shadow-md hover:scale-[1.03] transition cursor-move`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          checked={item.completed}
-                          onChange={() => toggleCompletion(item.id)}
-                          className="w-5 h-5 accent-pink-400"
-                        />
-                        <span
-                          className={`font-medium ${
-                            item.completed ? "line-through text-gray-500" : "text-gray-800"
-                          }`}
-                        >
-                          {item.text}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => handleDeleteTask(item.id)}
-                        className="text-red-500 hover:text-red-700 font-bold text-lg transition"
-                      >
-                        delete
-                      </button>
-                    </li>
-                  ))
-                )}
-              </ul>
-            </div>
-          ))}
-        </div>
+      {/* Input Bar */}
+      <div className="flex gap-3 justify-center mt-6">
+        <input
+          type="text"
+          value={task}
+          onChange={(e) => setTask(e.target.value)}
+          placeholder="Add a new task..."
+          className="w-2/3 md:w-1/3 px-4 py-2 rounded-xl border border-green-300 focus:ring-2 focus:ring-green-500 focus:outline-none bg-white shadow-sm"
+        />
+        <button
+          onClick={handleAddTask}
+          className="bg-green-700 hover:bg-green-900 text-white px-5 py-2 rounded-xl font-semibold shadow transition"
+        >
+          Add
+        </button>
       </div>
+
+      {/* Floating Tasks */}
+      {tasks.map((item) => (
+        <div
+          key={item.id}
+          onMouseDown={(e) => handleMouseDown(e, item.id)}
+          className={`absolute group rounded-2xl border border-green-200 bg-white/70 backdrop-blur-md shadow-lg hover:shadow-xl transition-all cursor-grab active:cursor-grabbing ${
+            draggingId === item.id ? "scale-105" : ""
+          }`}
+          style={{
+            top: item.y,
+            left: item.x,
+            userSelect: "none",
+            width: CARD_WIDTH,
+            transition: draggingId === item.id ? "none" : "top 0.15s, left 0.15s",
+          }}
+        >
+          <div className="p-4 flex justify-between items-start">
+            <div className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={item.completed}
+                onChange={() => toggleCompletion(item.id)}
+                className="w-5 h-5 accent-green-800 mt-1"
+              />
+              <span
+                className={`font-medium leading-tight break-words ${
+                  item.completed ? "line-through text-green-400" : "text-green-800"
+                }`}
+              >
+                {item.text}
+              </span>
+            </div>
+
+            <button
+              onClick={() => handleDeleteTask(item.id)}
+              className="text-gray-400 hover:text-red-500 transition text-xl font-semibold leading-none"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 };

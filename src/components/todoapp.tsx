@@ -125,7 +125,7 @@ const TodoApp: React.FC = () => {
           📝 To Do List Workspace
         </h1>
         <p className="text-center text-green-800 text-sm">
-          Add, Display, Drag, Delete, and Complete your tasks — now with collision protection!
+          Add, Display, Drag, Delete, and Complete your tasks
         </p>
       </header>
 

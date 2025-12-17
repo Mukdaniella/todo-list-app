@@ -25,14 +25,33 @@ const TodoApp: React.FC = () => {
     localStorage.setItem("tasks", JSON.stringify(tasks));
   }, [tasks]);
 
+  const findFreePosition = (startX: number, startY: number, existingTasks: Task[]) => {
+    let x = startX;
+    let y = startY;
+    const step = 40;
+    
+    while (existingTasks.some(t => isOverlapping({ x, y } as Task, t))) {
+      x += step;
+      if (x > window.innerWidth - CARD_WIDTH - 20) {
+        x = 20;
+        y += step;
+      }
+    }
+    
+    return constrainToViewport(x, y);
+  };
+
   const handleAddTask = () => {
     if (!task.trim()) return;
+    const baseX = 100 + (tasks.length % 5) * 50;
+    const baseY = 150 + Math.floor(tasks.length / 5) * 120;
+    const position = findFreePosition(baseX, baseY, tasks);
+    
     const newTask: Task = {
       id: Date.now(),
       text: task.trim(),
       completed: false,
-      x: 100 + tasks.length * 30,
-      y: 100 + tasks.length * 30,
+      ...position,
     };
     setTasks((prev) => [...prev, newTask]);
     setTask("");
@@ -61,32 +80,23 @@ const TodoApp: React.FC = () => {
   const CARD_HEIGHT = 100;
 
   // Check if two tasks overlap
-  const isOverlapping = (a: Task, b: Task) => {
+  const isOverlapping = (a: { x: number; y: number }, b: Task) => {
     return !(
-      a.x + CARD_WIDTH < b.x ||
-      a.x > b.x + CARD_WIDTH ||
-      a.y + CARD_HEIGHT < b.y ||
-      a.y > b.y + CARD_HEIGHT
+      a.x + CARD_WIDTH <= b.x ||
+      a.x >= b.x + CARD_WIDTH ||
+      a.y + CARD_HEIGHT <= b.y ||
+      a.y >= b.y + CARD_HEIGHT
     );
   };
 
-  // Find nearest free spot
-  const findFreePosition = (task: Task, others: Task[]) => {
-    const step = 40; // pixels to move to avoid overlap
-    let newX = task.x;
-    let newY = task.y;
-    let tries = 0;
-
-    while (
-      others.some((t) => t.id !== task.id && isOverlapping({ ...task, x: newX, y: newY }, t)) &&
-      tries < 50
-    ) {
-      newX += step;
-      newY += step;
-      tries++;
-    }
-
-    return { x: newX, y: newY };
+  // Constrain position within viewport
+  const constrainToViewport = (x: number, y: number) => {
+    const maxX = window.innerWidth - CARD_WIDTH - 20;
+    const maxY = window.innerHeight - CARD_HEIGHT - 20;
+    return {
+      x: Math.max(20, Math.min(x, maxX)),
+      y: Math.max(150, Math.min(y, maxY))
+    };
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -95,14 +105,13 @@ const TodoApp: React.FC = () => {
     setTasks((prev) =>
       prev.map((t) => {
         if (t.id === draggingId) {
-          const updated = {
-            ...t,
-            x: e.clientX - offset.x,
-            y: e.clientY - offset.y,
-          };
-          const others = prev.filter((p) => p.id !== t.id);
-          const newPos = findFreePosition(updated, others);
-          return { ...updated, ...newPos };
+          const desiredPos = constrainToViewport(
+            e.clientX - offset.x,
+            e.clientY - offset.y
+          );
+          const others = prev.filter(task => task.id !== t.id);
+          const finalPos = findFreePosition(desiredPos.x, desiredPos.y, others);
+          return { ...t, ...finalPos };
         }
         return t;
       })

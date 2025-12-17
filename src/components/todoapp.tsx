@@ -65,14 +65,24 @@ const TodoApp: React.FC = () => {
   const handleDeleteTask = (id: number) =>
     setTasks((prev) => prev.filter((t) => t.id !== id));
 
-  const handleMouseDown = (e: React.MouseEvent, id: number) => {
+  const handleStart = (clientX: number, clientY: number, id: number) => {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
     setDraggingId(id);
     setOffset({
-      x: e.clientX - task.x,
-      y: e.clientY - task.y,
+      x: clientX - task.x,
+      y: clientY - task.y,
     });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent, id: number) => {
+    handleStart(e.clientX, e.clientY, id);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent, id: number) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    handleStart(touch.clientX, touch.clientY, id);
   };
 
   // --- Collision detection logic ---
@@ -99,15 +109,15 @@ const TodoApp: React.FC = () => {
     };
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMove = (clientX: number, clientY: number) => {
     if (draggingId === null) return;
 
     setTasks((prev) =>
       prev.map((t) => {
         if (t.id === draggingId) {
           const desiredPos = constrainToViewport(
-            e.clientX - offset.x,
-            e.clientY - offset.y
+            clientX - offset.x,
+            clientY - offset.y
           );
           const others = prev.filter(task => task.id !== t.id);
           const finalPos = findFreePosition(desiredPos.x, desiredPos.y, others);
@@ -118,8 +128,27 @@ const TodoApp: React.FC = () => {
     );
   };
 
-  const handleMouseUp = () => {
+  const handleMouseMove = (e: React.MouseEvent) => {
+    handleMove(e.clientX, e.clientY);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (draggingId === null) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    handleMove(touch.clientX, touch.clientY);
+  };
+
+  const handleEnd = () => {
     setDraggingId(null);
+  };
+
+  const handleMouseUp = () => {
+    handleEnd();
+  };
+
+  const handleTouchEnd = () => {
+    handleEnd();
   };
 
   return (
@@ -127,6 +156,8 @@ const TodoApp: React.FC = () => {
       className="min-h-screen w-full bg-gradient-to-br from-green-50 via-green-100 to-green-200 relative overflow-hidden"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       {/* Top Bar */}
       <header className="w-full bg-white/80 backdrop-blur-md shadow-sm border-b border-green-200 p-5 sticky top-0 z-10">
@@ -160,7 +191,8 @@ const TodoApp: React.FC = () => {
         <div
           key={item.id}
           onMouseDown={(e) => handleMouseDown(e, item.id)}
-          className={`absolute group rounded-2xl border border-green-200 bg-white/70 backdrop-blur-md shadow-lg hover:shadow-xl transition-all cursor-grab active:cursor-grabbing ${
+          onTouchStart={(e) => handleTouchStart(e, item.id)}
+          className={`absolute group rounded-2xl border border-green-200 bg-white/70 backdrop-blur-md shadow-lg hover:shadow-xl transition-all cursor-grab active:cursor-grabbing touch-none ${
             draggingId === item.id ? "scale-105" : ""
           }`}
           style={{
